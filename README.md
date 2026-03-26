@@ -1,6 +1,6 @@
 # OpenClaw Social-Push 使用文档
 
-> 从零开始，一条命令发布到 9 个社交平台
+> 从零开始，一条命令发布到 10 个社交平台；Reddit 与知乎已进入第一阶段支持
 
 ---
 
@@ -23,11 +23,14 @@
 
 ## 1. 项目简介
 
-**Social-Push** 是一个 OpenClaw 内置 Skill，让你通过一条自然语言指令，把内容同时发布到多个社交平台。
+**Social-Push** 是一个 OpenClaw 可安装 Skill（skill 仓库），让你通过一条自然语言指令，把内容同时发布到多个社交平台。
 
 **核心特点：**
 
-- 支持 8 个平台：X (Twitter)、Instagram、Threads、Facebook、小红书、微博、微信公众号、掘金
+- 当前支持 10 个平台：X (Twitter)、Instagram、Threads、Facebook、小红书、微博、微信公众号、掘金、Reddit、知乎
+- Reddit 第一阶段支持文本帖/链接帖/图帖（单图与多图）、subreddit、flair、NSFW、spoiler
+- 知乎第一阶段支持文章/专栏与想法发布
+- 仓库现已包含五层能力：`social-push` 发布层、`account-matrix` 账号治理层、`content-assignment-guard` 内容指派防撞层、`matrix-orchestrator` 节点内调度层、`openclaw-cluster-orchestrator` 主控调度层
 - 不需要任何平台 API Key，直接复用浏览器登录状态
 - 支持文字、图片、长文章等多种内容形式
 - 所有操作在本地执行，不经过第三方服务器
@@ -39,7 +42,7 @@
 
 ## 2. 系统架构
 
-```
+```text
 你的指令 (Telegram / QQ / 终端)
         ↓
 OpenClaw Gateway (localhost:18789)
@@ -124,26 +127,38 @@ openclaw browser snapshot
 
 ### 5.1 从 GitHub 安装
 
+在 OpenClaw workspace 根目录执行：
+
 ```bash
-# 克隆仓库到 OpenClaw 的 skills 目录
+# 克隆仓库到 workspace 下的 skills 目录
 git clone https://github.com/shopeetw225-byte/openclaw-social-push.git \
-  ~/.openclaw/skills/social-push
+  skills/social-push
 ```
+
+> 说明：本文档与 GUIDE 统一使用 workspace 相对路径 `skills/social-push/` 表示 skill 仓库位置。
 
 ### 5.2 验证 Skill 已加载
 
 ```bash
-openclaw skill list
+openclaw skills list
 ```
 
 应能看到 `social-push` 出现在列表中。
 
 ### 5.3 Skill 文件结构
 
-```
-social-push/
+```text
+skills/social-push/
 ├── SKILL.md                     # Skill 定义与架构说明
 ├── GUIDE.md                     # 配置与使用指南
+├── account-matrix/              # 独立账号矩阵 skill
+├── matrix-orchestrator/         # 独立节点内调度与预检 skill
+├── openclaw-cluster-orchestrator/ # 独立 cluster 主控 skill
+├── docs/
+│   ├── cluster/                 # cluster runtime
+│   ├── nodes/                   # node-local runtime
+│   ├── ops/                     # content-assignment ledgers / conflicts / overrides
+│   └── 2026-03-23-reddit-zhihu-support-research.md
 ├── scripts/
 │   ├── stage_upload_media.sh    # 图片暂存脚本
 │   └── cleanup_staged_media.sh  # 临时文件清理脚本
@@ -156,7 +171,10 @@ social-push/
     ├── 小红书长文.md
     ├── 微博.md
     ├── 微信公众号文章.md
-    └── 掘金文章.md
+    ├── 掘金文章.md
+    ├── Reddit帖子.md
+    ├── 知乎文章.md
+    └── 知乎想法.md
 ```
 
 ---
@@ -164,6 +182,32 @@ social-push/
 ## 6. 配置消息通道
 
 你可以通过 **Telegram**、**QQ** 或 **终端** 向 OpenClaw 发送发布指令。至少配置一个通道。
+
+### 6.0 Content Assignment Guard（多人多号防撞）
+
+当你需要多人协作、提前指定目标账号、并防止重复内容/发错号时，先走 guard 层再入队：
+
+```bash
+python3 matrix-orchestrator/scripts/enqueue_guarded_job.py \
+  --queue docs/cluster/cluster-job-queue.md \
+  --assignment-ledger docs/ops/content-assignment-ledger.md \
+  --conflict-ledger docs/ops/conflict-ledger.md \
+  --platform zhihu \
+  --account-alias main \
+  --content-type idea \
+  --preferred-node worker-zhihu-01 \
+  --submission-ref ticket://ops-1001 \
+  --title "Guarded publish" \
+  --body "This job is reserved before it becomes runnable."
+```
+
+运行时会把状态写到：
+
+- `docs/ops/content-assignment-ledger.md`
+- `docs/ops/conflict-ledger.md`
+- `docs/ops/operator-override-ledger.md`
+
+如果发现重复内容、目标账号不一致、或后续浏览器身份不一致，系统会默认阻断；只有 OpenClaw 控制人可以通过 override 继续一次或取消任务。
 
 ### 6.1 配置 Telegram
 
@@ -187,27 +231,35 @@ social-push/
 {
   "channels": {
     "telegram": {
-      "token": "你的Bot Token",
-      "userId": "你的User ID"
+      "enabled": true,
+      "dmPolicy": "pairing",
+      "botToken": "<你的 Bot Token>",
+      "allowFrom": ["<你的 Telegram User ID>"],
+      "streaming": "partial"
     }
   }
 }
 ```
 
-### 6.2 配置 QQ
+### 6.2 配置 QQ Bot
 
 编辑 `~/.openclaw/openclaw.json`：
 
 ```json
 {
   "channels": {
-    "qq": {
-      "appId": "你的App ID",
-      "clientSecret": "你的Client Secret"
+    "qqbot": {
+      "enabled": true,
+      "appId": "<QQ 开放平台 App ID>",
+      "clientSecret": "<Client Secret>",
+      "token": "<App ID>:<Token>",
+      "allowFrom": ["*"]
     }
   }
 }
 ```
+
+> 说明：README 与 GUIDE 已统一使用 `telegram` / `qqbot` 的 channel 命名与配置示例。
 
 ### 6.3 直接使用终端
 
@@ -225,12 +277,14 @@ Social-Push 复用你 Chrome 浏览器中的登录状态，因此你需要 **手
 |------|---------|
 | X (Twitter) | https://x.com |
 | Instagram | https://www.instagram.com |
-| Threads | https://www.threads.net |
+| Threads | https://www.threads.com/ |
 | Facebook | https://www.facebook.com |
-| 小红书 | https://www.xiaohongshu.com |
+| 小红书 | https://creator.xiaohongshu.com/ |
 | 微博 | https://weibo.com |
 | 微信公众号 | https://mp.weixin.qq.com |
 | 掘金 | https://juejin.cn |
+| Reddit | https://www.reddit.com |
+| 知乎 | https://www.zhihu.com |
 
 > **重要：**
 > - 只需登录你想要发布的平台，不用全部登录
@@ -254,37 +308,37 @@ Social-Push 复用你 Chrome 浏览器中的登录状态，因此你需要 **手
 
 **发布纯文字：**
 
-```
+```text
 发一条推特：Hello World! 这是我的第一条自动发布
 ```
 
-```
+```text
 发微博：今天天气真好 #随手拍
 ```
 
 **发布带图片的内容：**
 
-```
+```text
 把桌面上的 photo.jpg 发到 Instagram，配文：周末的阳光
 ```
 
-```
+```text
 发一条小红书图文，图片用 ~/Pictures/outfit.jpg，标题：今日穿搭分享
 ```
 
 **多平台同时发布：**
 
-```
+```text
 把这条内容同时发到 X 和 Threads：新产品正式上线了！
 ```
 
 **发布长文章：**
 
-```
+```text
 发一篇掘金文章，标题：《从零搭建自动化发布系统》，正文：...
 ```
 
-```
+```text
 发一篇微信公众号文章，标题：周报，正文：本周进展...
 ```
 
@@ -369,7 +423,141 @@ openclaw chat "发一条微博：终端发布测试"
 | 封面 | 可选封面图 |
 | 分类 | 需要选择文章分类 |
 
+### Reddit
+
+| 项目 | 支持范围 |
+|------|---------|
+| 帖子类型 | 文本帖 / 链接帖 / 图帖 |
+| 图片能力 | 单图 / 多图图帖 |
+| 发布参数 | subreddit、flair、NSFW、spoiler |
+| 实测状态 | Reddit 文本帖已于 `2026-03-23` 完成真实发布验证；图帖提交流程已验证，但在 `r/test` 上被內容過濾器移除 |
+
+### 账号与调度层
+
+当前仓库除发布 skill 外，还额外提供：
+
+- `account-matrix/`
+  - 用于账号矩阵、验证矩阵、发布前检查清单模板
+- `matrix-orchestrator/`
+  - 用于读取 `docs/matrix/` 运行时数据、做 `go / warn / block` 预检，并为节点内发布和结果回填提供执行层
+- `openclaw-cluster-orchestrator/`
+  - 用于读取 `docs/cluster/` 节点矩阵与 cluster job queue，选择本地 worker agent，并把任务 fan-out 到 `docs/nodes/<node_id>/matrix/`
+
+这些子目录各自包含 `SKILL.md`，可以在 OpenClaw workspace 中单独注册，以便在需要的时候激活对应的治理、预检、调度流程。
+
+### OpenClaw Cluster（V1）
+
+第一版 cluster 不是多机器集群，而是：
+
+- 单个 OpenClaw Gateway
+- 多个独立 agent
+- 一个主控 agent + 多个 worker agent
+
+推荐角色：
+
+- `main` 或 `main-orchestrator`
+  - 负责 cluster 控制面
+- `publisher-zhihu`
+  - 负责知乎节点
+- `publisher-reddit`
+  - 负责 Reddit 节点
+
+V1 的执行链路固定为：
+
+```text
+openclaw-cluster-orchestrator
+  -> worker agent
+  -> matrix-orchestrator
+  -> social-push
+```
+
+### 知乎
+
+| 项目 | 支持范围 |
+|------|---------|
+| 内容类型 | 文章 / 专栏、想法 |
+| 文章能力 | 标题 + 正文发布 |
+| 想法能力 | 纯文本想法发布 |
+| 实测状态 | 知乎文章、知乎想法已于 `2026-03-23` 完成真实发布验证 |
+
+调研背景见：`docs/2026-03-23-reddit-zhihu-support-research.md`
+
+推荐配合阅读：
+
+- `docs/account-matrix-sample.md`
+- `docs/matrix-system-roadmap.md`
+- `docs/cluster/node-matrix.md`
+- `docs/cluster/cluster-job-queue.md`
+
+> 说明：当前仅在知乎文章/专栏与知乎想法上接入发布流程，知乎回答尚未纳入，请引导用户将回答类意图改写成文章或想法。
+
 ---
+
+## Cluster Quickstart
+
+如果你要开始用 V1 的 OpenClaw cluster 主控层，最短路径是：
+
+```bash
+# 1. 创建本地 worker agents
+python3 openclaw-cluster-orchestrator/scripts/bootstrap_local_agents.py \
+  --node-matrix docs/cluster/node-matrix.md \
+  --workspace "$HOME/.openclaw/workspace"
+
+# 2. 加一条 cluster job
+python3 openclaw-cluster-orchestrator/scripts/enqueue_cluster_job.py \
+  --platform zhihu \
+  --account-alias main \
+  --content-type idea \
+  --preferred-node worker-zhihu-01 \
+  --title "Cluster publish" \
+  --body "This is a cluster publish test."
+
+# 3. 确认 skill 已加载
+openclaw skills check
+
+# 4. 查看当前 cluster 状态
+python3 openclaw-cluster-orchestrator/scripts/cluster_status.py
+
+# 5. 执行一条 cluster job
+python3 openclaw-cluster-orchestrator/scripts/run_next_cluster_job.py
+```
+
+如果你想先验证 queue / ledger / log 变化，不触发真实 worker，可用 dry-run：
+
+```bash
+python3 openclaw-cluster-orchestrator/scripts/run_next_cluster_job.py \
+  --dry-run-result-status publish_filtered \
+  --dry-run-evidence demo://cluster/filter \
+  --dry-run-notes demo
+```
+
+如果你只想预览会创建哪些本地 worker agents：
+
+```bash
+python3 openclaw-cluster-orchestrator/scripts/bootstrap_local_agents.py \
+  --node-matrix docs/cluster/node-matrix.md \
+  --workspace "$HOME/.openclaw/workspace" \
+  --dry-run
+```
+
+如果你想清空 cluster runtime 与 node-local runtime，只保留表头：
+
+```bash
+python3 openclaw-cluster-orchestrator/scripts/reset_cluster_runtime.py --dry-run
+python3 openclaw-cluster-orchestrator/scripts/reset_cluster_runtime.py
+```
+
+V1 目前已经验证：
+
+- 主控可以选择 worker agent
+- 主控可以把 job fan-out 到 `docs/nodes/<node_id>/matrix/`
+- worker 可以继续调用 `matrix-orchestrator` 和 `social-push`
+- 真实失败原因会被准确记录到 cluster ledger / log
+
+运行前置条件：
+
+- 目标 worker 使用的账号必须已经登录到对应平台
+- 如果该节点依赖 `chrome-relay`，目标浏览器标签页上的 OpenClaw Browser Relay 必须是 `ON`
 
 ## 10. 图片处理机制
 
@@ -386,7 +574,7 @@ Social-Push 按以下顺序查找图片：
 
 为保护原始文件，所有图片在上传前会被复制到临时目录：
 
-```
+```text
 原始文件                              暂存文件
 ~/Desktop/photo.jpg  ──复制──>  /tmp/openclaw/uploads/social-push-1711216423.jpg
 ```
@@ -453,26 +641,3 @@ openclaw gateway start
 | 临时文件 | 暂存图片发布后自动清理 |
 | 原始文件保护 | 永远不删除用户的原始文件 |
 | 安全删除限制 | 清理脚本仅允许删除 `/tmp/openclaw/uploads/` 下的文件 |
-
----
-
-## 快速参考卡
-
-```
-# 启动服务
-openclaw gateway start
-
-# 安装浏览器插件
-openclaw browser extension install
-
-# 发布示例
-"发推特：Hello World"
-"发 Instagram，图片用 ~/photo.jpg，配文：今日分享"
-"同时发到 X 和 Threads：新功能上线"
-"发微博：周末愉快 #生活日常"
-"发一篇掘金文章，标题：技术分享，正文：..."
-
-# 排查问题
-openclaw browser snapshot     # 测试插件连接
-openclaw gateway status       # 检查网关状态
-```

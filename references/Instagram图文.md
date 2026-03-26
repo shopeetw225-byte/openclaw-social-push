@@ -25,11 +25,16 @@
 ```bash
 PROFILE='chrome-relay'
 OPENCLAW_BIN='/Users/openclawcn/.homebrew/bin/openclaw'
+if [ -d "$HOME/.openclaw/workspace/skills/social-push" ]; then
+  SKILL_ROOT="$HOME/.openclaw/workspace/skills/social-push"
+else
+  SKILL_ROOT="$HOME/.openclaw/skills/social-push"
+fi
 POST_TEXT='把这里替换成你的贴文文案'
 IMAGE_SRC='/绝对路径/图片.jpg'
 
-STAGE_SH='/Users/openclawcn/.openclaw/workspace/skills/social-push/scripts/stage_upload_media.sh'
-CLEAN_SH='/Users/openclawcn/.openclaw/workspace/skills/social-push/scripts/cleanup_staged_media.sh'
+STAGE_SH="$SKILL_ROOT/scripts/stage_upload_media.sh"
+CLEAN_SH="$SKILL_ROOT/scripts/cleanup_staged_media.sh"
 
 find_instagram_tab() {
   "$OPENCLAW_BIN" browser --browser-profile "$PROFILE" tabs | sed -n '/https:\/\/www\.instagram\.com\//{n;s/^ *id: //p;}' | tail -n1
@@ -143,14 +148,19 @@ fi
 ```bash
 PROFILE='chrome-relay'
 OPENCLAW_BIN='/Users/openclawcn/.homebrew/bin/openclaw'
+if [ -d "$HOME/.openclaw/workspace/skills/social-push" ]; then
+  SKILL_ROOT="$HOME/.openclaw/workspace/skills/social-push"
+else
+  SKILL_ROOT="$HOME/.openclaw/skills/social-push"
+fi
 POST_TEXT='把这里替换成你的贴文文案'
 IMAGE_PATHS=(
   '/绝对路径/图片1.jpg'
   '/绝对路径/图片2.jpg'
 )
 
-STAGE_SH='/Users/openclawcn/.openclaw/workspace/skills/social-push/scripts/stage_upload_media.sh'
-CLEAN_SH='/Users/openclawcn/.openclaw/workspace/skills/social-push/scripts/cleanup_staged_media.sh'
+STAGE_SH="$SKILL_ROOT/scripts/stage_upload_media.sh"
+CLEAN_SH="$SKILL_ROOT/scripts/cleanup_staged_media.sh"
 
 find_instagram_tab() {
   "$OPENCLAW_BIN" browser --browser-profile "$PROFILE" tabs | sed -n '/https:\/\/www\.instagram\.com\//{n;s/^ *id: //p;}' | tail -n1

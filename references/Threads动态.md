@@ -132,11 +132,16 @@ fi
 ```bash
 PROFILE='chrome-relay'
 OPENCLAW_BIN='/Users/openclawcn/.homebrew/bin/openclaw'
+if [ -d "$HOME/.openclaw/workspace/skills/social-push" ]; then
+  SKILL_ROOT="$HOME/.openclaw/workspace/skills/social-push"
+else
+  SKILL_ROOT="$HOME/.openclaw/skills/social-push"
+fi
 POST_TEXT='把这里替换成你的 Threads 正文'
 IMAGE_SRC='/绝对路径/图片.jpg'
 
-STAGE_SH='/Users/openclawcn/.openclaw/workspace/skills/social-push/scripts/stage_upload_media.sh'
-CLEAN_SH='/Users/openclawcn/.openclaw/workspace/skills/social-push/scripts/cleanup_staged_media.sh'
+STAGE_SH="$SKILL_ROOT/scripts/stage_upload_media.sh"
+CLEAN_SH="$SKILL_ROOT/scripts/cleanup_staged_media.sh"
 
 find_threads_tab() {
   "$OPENCLAW_BIN" browser --browser-profile "$PROFILE" tabs | sed -n '/https:\/\/www\.threads\.com\//{n;s/^ *id: //p;}' | tail -n1

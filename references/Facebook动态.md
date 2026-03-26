@@ -86,12 +86,17 @@ rg -F "$POST_TEXT" "$VERIFY" >/dev/null && echo "发布成功: $POST_TEXT" || ec
 ```bash
 PROFILE='chrome-relay'
 OPENCLAW_BIN='/Users/openclawcn/.homebrew/bin/openclaw'
+if [ -d "$HOME/.openclaw/workspace/skills/social-push" ]; then
+  SKILL_ROOT="$HOME/.openclaw/workspace/skills/social-push"
+else
+  SKILL_ROOT="$HOME/.openclaw/skills/social-push"
+fi
 POST_TEXT='把这里替换成你的动态内容'
 IMAGE_SRC='/绝对路径/图片.jpg'
 PROFILE_URL='https://www.facebook.com/me'
 
-STAGE_SH='/Users/openclawcn/.openclaw/workspace/skills/social-push/scripts/stage_upload_media.sh'
-CLEAN_SH='/Users/openclawcn/.openclaw/workspace/skills/social-push/scripts/cleanup_staged_media.sh'
+STAGE_SH="$SKILL_ROOT/scripts/stage_upload_media.sh"
+CLEAN_SH="$SKILL_ROOT/scripts/cleanup_staged_media.sh"
 
 find_facebook_tab() {
   "$OPENCLAW_BIN" browser --browser-profile "$PROFILE" tabs | sed -n '/https:\/\/www\.facebook\.com\//{n;s/^ *id: //p;}' | tail -n1
@@ -186,6 +191,11 @@ fi
 ```bash
 PROFILE='chrome-relay'
 OPENCLAW_BIN='/Users/openclawcn/.homebrew/bin/openclaw'
+if [ -d "$HOME/.openclaw/workspace/skills/social-push" ]; then
+  SKILL_ROOT="$HOME/.openclaw/workspace/skills/social-push"
+else
+  SKILL_ROOT="$HOME/.openclaw/skills/social-push"
+fi
 POST_TEXT='把这里替换成你的动态内容'
 IMAGE_PATHS=(
   '/绝对路径/图片1.jpg'
@@ -193,8 +203,8 @@ IMAGE_PATHS=(
 )
 PROFILE_URL='https://www.facebook.com/me'
 
-STAGE_SH='/Users/openclawcn/.openclaw/workspace/skills/social-push/scripts/stage_upload_media.sh'
-CLEAN_SH='/Users/openclawcn/.openclaw/workspace/skills/social-push/scripts/cleanup_staged_media.sh'
+STAGE_SH="$SKILL_ROOT/scripts/stage_upload_media.sh"
+CLEAN_SH="$SKILL_ROOT/scripts/cleanup_staged_media.sh"
 
 find_facebook_tab() {
   "$OPENCLAW_BIN" browser --browser-profile "$PROFILE" tabs | sed -n '/https:\/\/www\.facebook\.com\//{n;s/^ *id: //p;}' | tail -n1

@@ -1,0 +1,7 @@
+interface:
+  display_name: "Account Matrix"
+  short_description: "Track publishing accounts and verification state"
+  default_prompt: "Use $account-matrix to create or update account and verification matrices for this publishing setup."
+
+policy:
+  allow_implicit_invocation: false

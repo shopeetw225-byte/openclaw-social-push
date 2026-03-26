@@ -1,0 +1,7 @@
+interface:
+  display_name: "Matrix Orchestrator"
+  short_description: "Preflight and dispatch publishing jobs"
+  default_prompt: "Use $matrix-orchestrator to preflight, dispatch, and record a publishing job from docs/matrix."
+
+policy:
+  allow_implicit_invocation: false
