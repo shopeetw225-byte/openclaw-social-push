@@ -1,0 +1,671 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>项目工作交接总览</title>
+    <style>
+      :root {
+        --bg: #f3eee4;
+        --panel: rgba(255, 252, 246, 0.92);
+        --panel-strong: rgba(255, 252, 246, 0.98);
+        --text: #1f2722;
+        --muted: #5b6a64;
+        --line: rgba(31, 39, 34, 0.12);
+        --accent: #0f766e;
+        --accent-soft: rgba(15, 118, 110, 0.12);
+        --warn: #b45309;
+        --warn-soft: rgba(180, 83, 9, 0.14);
+        --danger: #b42318;
+        --danger-soft: rgba(180, 35, 24, 0.12);
+        --shadow: 0 18px 48px rgba(31, 39, 34, 0.08);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        font-family: "IBM Plex Sans", "Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif;
+        color: var(--text);
+        background:
+          radial-gradient(circle at top left, rgba(15, 118, 110, 0.12), transparent 30%),
+          radial-gradient(circle at top right, rgba(180, 83, 9, 0.1), transparent 24%),
+          linear-gradient(180deg, #f8f4ec 0%, #efe9de 100%);
+      }
+
+      a {
+        color: inherit;
+      }
+
+      .page {
+        width: min(1220px, calc(100% - 28px));
+        margin: 0 auto;
+        padding: 36px 0 64px;
+      }
+
+      .hero,
+      .panel,
+      .project-card {
+        border: 1px solid var(--line);
+        border-radius: 24px;
+        background: var(--panel);
+        box-shadow: var(--shadow);
+      }
+
+      .hero {
+        padding: 30px;
+        background: linear-gradient(135deg, rgba(255, 252, 246, 0.98), rgba(246, 239, 228, 0.9));
+      }
+
+      .eyebrow,
+      .status,
+      .priority {
+        display: inline-flex;
+        align-items: center;
+        padding: 8px 12px;
+        border-radius: 999px;
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 0.04em;
+      }
+
+      .eyebrow {
+        background: var(--accent-soft);
+        color: var(--accent);
+      }
+
+      h1 {
+        margin: 16px 0 12px;
+        font-size: clamp(34px, 5vw, 58px);
+        line-height: 1.02;
+      }
+
+      .hero p {
+        margin: 0;
+        max-width: 900px;
+        color: var(--muted);
+        font-size: 17px;
+        line-height: 1.72;
+      }
+
+      .hero-links,
+      .link-row,
+      .tag-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+      }
+
+      .hero-links {
+        margin-top: 18px;
+      }
+
+      .hero-links a,
+      .link-row a {
+        text-decoration: none;
+        padding: 9px 12px;
+        border-radius: 999px;
+        border: 1px solid var(--line);
+        background: rgba(255, 255, 255, 0.42);
+        font-size: 13px;
+        font-weight: 600;
+      }
+
+      .grid-4,
+      .grid-3,
+      .project-grid,
+      .subgrid {
+        display: grid;
+        gap: 16px;
+      }
+
+      .grid-4 {
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        margin-top: 20px;
+      }
+
+      .grid-3 {
+        grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+        margin-top: 18px;
+      }
+
+      .project-grid {
+        grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+        margin-top: 16px;
+      }
+
+      .panel {
+        padding: 20px 22px;
+      }
+
+      .panel strong {
+        display: block;
+        font-size: 18px;
+        line-height: 1.3;
+      }
+
+      .panel p,
+      .project-card p {
+        margin: 10px 0 0;
+        color: var(--muted);
+        line-height: 1.7;
+      }
+
+      .section-title {
+        margin: 30px 0 12px;
+        font-size: 14px;
+        font-weight: 800;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--muted);
+      }
+
+      .project-card {
+        padding: 22px;
+        background: var(--panel-strong);
+      }
+
+      .project-top {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 12px;
+      }
+
+      .project-top h2 {
+        margin: 0;
+        font-size: 25px;
+        line-height: 1.2;
+      }
+
+      .project-meta {
+        margin-top: 10px;
+        color: var(--muted);
+        font-size: 14px;
+        line-height: 1.6;
+      }
+
+      .status {
+        background: var(--accent-soft);
+        color: var(--accent);
+        white-space: nowrap;
+      }
+
+      .status.warn {
+        background: var(--warn-soft);
+        color: var(--warn);
+      }
+
+      .status.danger {
+        background: var(--danger-soft);
+        color: var(--danger);
+      }
+
+      .priority {
+        margin-top: 12px;
+        background: rgba(31, 39, 34, 0.06);
+        color: var(--text);
+      }
+
+      .meta-title {
+        margin: 18px 0 8px;
+        font-size: 13px;
+        font-weight: 800;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+      }
+
+      .subgrid {
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      }
+
+      .mini-box {
+        padding: 14px 14px 12px;
+        border: 1px solid var(--line);
+        border-radius: 16px;
+        background: rgba(244, 239, 230, 0.45);
+      }
+
+      .mini-box strong {
+        display: block;
+        font-size: 13px;
+        line-height: 1.4;
+      }
+
+      .mini-box span {
+        display: block;
+        margin-top: 6px;
+        color: var(--muted);
+        font-size: 13px;
+        line-height: 1.6;
+      }
+
+      .tag {
+        display: inline-flex;
+        align-items: center;
+        padding: 7px 10px;
+        border-radius: 999px;
+        background: rgba(31, 39, 34, 0.06);
+        font-size: 12px;
+        font-weight: 700;
+      }
+
+      ul {
+        margin: 0;
+        padding-left: 18px;
+        color: var(--muted);
+        line-height: 1.7;
+      }
+
+      li + li {
+        margin-top: 6px;
+      }
+
+      .action-list {
+        margin-top: 6px;
+      }
+
+      .footer-note {
+        margin-top: 28px;
+        padding: 18px 20px;
+        border: 1px solid var(--line);
+        border-radius: 20px;
+        background: rgba(255, 252, 246, 0.72);
+        color: var(--muted);
+        line-height: 1.75;
+      }
+
+      code {
+        padding: 2px 6px;
+        border-radius: 8px;
+        background: rgba(31, 39, 34, 0.06);
+        font-family: "SFMono-Regular", "Menlo", "Consolas", monospace;
+        font-size: 0.95em;
+      }
+
+      @media (max-width: 720px) {
+        .page {
+          width: min(100% - 16px, 1220px);
+          padding-top: 16px;
+        }
+
+        .hero,
+        .panel,
+        .project-card,
+        .footer-note {
+          border-radius: 18px;
+        }
+
+        .project-top {
+          flex-direction: column;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="page">
+      <section class="hero">
+        <div class="eyebrow">工作交接页 · 最后整理 2026-03-27</div>
+        <h1>这 5 个项目现在处于什么状态，接手后应该先做什么</h1>
+        <p>
+          这不是展示页，而是给接手人用的交接总览。重点是把当前状态、已经完成的部分、还没完成的部分、
+          主要阻塞和接手后的第一步说清楚，避免下一位同学从零开始重新判断。
+        </p>
+
+        <div class="hero-links">
+          <a href="https://openclaw-project-portfolio.pages.dev">线上交接页</a>
+          <a href="https://github.com/shopeetw225-byte/openclaw-social-push">OpenClaw Social-Push</a>
+          <a href="https://github.com/shopeetw225-byte/tts-companion-web">TTS Companion Web</a>
+          <a href="https://github.com/shopeetw225-byte/sheep">Sheep</a>
+          <a href="https://github.com/shopeetw225-byte/openclaw-anzhuang">OpenClaw 安装器</a>
+          <a href="https://github.com/shopeetw225-byte/ssh-tool">ssh-tool</a>
+        </div>
+
+        <div class="grid-4">
+          <article class="panel">
+            <strong>整体判断</strong>
+            <p>5 个仓库都已经不是概念阶段，主链路基本都有了，但还没有哪个可以直接当成“完全收口”的成熟产品。</p>
+          </article>
+          <article class="panel">
+            <strong>当前最高优先级</strong>
+            <p>`openclaw-social-push` 的 cluster 真机联调最值得继续推进，它最接近“差最后一公里”的状态。</p>
+          </article>
+          <article class="panel">
+            <strong>这次交接已做完</strong>
+            <p>5 个仓库的 README 已补清楚，这份 HTML 已经部署到 Cloudflare Pages，可直接转发查看。</p>
+          </article>
+          <article class="panel">
+            <strong>接手顺序建议</strong>
+            <p>先盯 `social-push`，再看 `sheep` / `tts-companion-web`，最后处理 `openclaw-anzhuang` 和 `ssh-tool` 的交付稳定性。</p>
+          </article>
+        </div>
+      </section>
+
+      <div class="section-title">接手说明</div>
+
+      <section class="grid-3">
+        <article class="panel">
+          <strong>这页适合谁看</strong>
+          <p>新接手项目的人、需要做阶段汇报的人、或者只想快速知道“哪个仓库最值得继续投时间”的负责人。</p>
+        </article>
+        <article class="panel">
+          <strong>这页的信息来源</strong>
+          <p>来自各仓库 README、目录结构、脚本入口、依赖声明和最近提交主题，时间点固定在 2026-03-27。</p>
+        </article>
+        <article class="panel">
+          <strong>这页没有覆盖什么</strong>
+          <p>没有做逐行代码审计，也没有代替完整测试结论；这里更偏交接判断，不是正式代码 review 报告。</p>
+        </article>
+      </section>
+
+      <div class="section-title">今日可接手动作</div>
+
+      <section class="grid-3">
+        <article class="panel">
+          <strong>1. Social-Push</strong>
+          <p>先把 worker readiness 和 Browser Relay 真实联调打通，再继续扩真实验证覆盖。</p>
+        </article>
+        <article class="panel">
+          <strong>2. Sheep / TTS</strong>
+          <p>两边都已经到了“产品验证可演示”的阶段，接手时优先补真实外部依赖下的回归验证。</p>
+        </article>
+        <article class="panel">
+          <strong>3. 安装器 / ssh-tool</strong>
+          <p>它们更像交付型仓库，下一步价值主要在稳定发布链路、环境兼容性和更强的验证护栏。</p>
+        </article>
+      </section>
+
+      <div class="section-title">项目逐项交接</div>
+
+      <section class="project-grid">
+        <article class="project-card">
+          <div class="project-top">
+            <div>
+              <h2>OpenClaw Social-Push</h2>
+              <div class="project-meta">多平台浏览器自动化发布矩阵，已经从单一 skill 演进成发布 + 调度 + cluster 的工具链。</div>
+            </div>
+            <span class="status danger">P0 · 正在等真机联调</span>
+          </div>
+
+          <div class="priority">建议优先接手</div>
+
+          <div class="meta-title">项目作用</div>
+          <p>负责把内容通过 Browser Relay 分发到多个社交平台，同时用 markdown ledger 管理账号、验证状态、任务队列和结果。</p>
+
+          <div class="meta-title">当前状态</div>
+          <div class="subgrid">
+            <div class="mini-box">
+              <strong>已完成</strong>
+              <span>10 个平台 workflow 已进仓库，节点内矩阵和 cluster V1 已经成型。</span>
+            </div>
+            <div class="mini-box">
+              <strong>已验证</strong>
+              <span>知乎文章 / 想法、Reddit 文本帖、Instagram 单图、Threads 文字 / 单图已留有验证记录。</span>
+            </div>
+            <div class="mini-box">
+              <strong>还没收口</strong>
+              <span>平台验证深度不均匀，cluster 真机跑通度还不够高。</span>
+            </div>
+          </div>
+
+          <div class="meta-title">当前阻塞</div>
+          <ul>
+            <li>真实执行仍依赖 Browser Relay 附着和正确账号登录，这是当前最常见的失败点。</li>
+            <li>部分 workflow 只有模板级或提交流程级验证，不能直接当成稳定可用。</li>
+            <li>cluster 现在虽有 readiness 检查和 retry / requeue，但最后一公里仍是环境联调问题。</li>
+          </ul>
+
+          <div class="meta-title">接手第一步</div>
+          <ul class="action-list">
+            <li>先跑 `cluster_status --include-readiness`，确认 worker 当前就绪状态。</li>
+            <li>优先盯住 `docs/cluster/` 和 `docs/matrix/verification-matrix.md`，不要只看 workflow 模板。</li>
+            <li>接着尝试跑一轮最小 cluster 真机任务，先解决 relay / 登录态问题，再扩平台覆盖。</li>
+          </ul>
+
+          <div class="meta-title">关键入口</div>
+          <div class="tag-row">
+            <span class="tag">README / GUIDE</span>
+            <span class="tag">docs/cluster</span>
+            <span class="tag">docs/matrix</span>
+            <span class="tag">matrix-orchestrator</span>
+            <span class="tag">openclaw-cluster-orchestrator</span>
+          </div>
+
+          <div class="link-row" style="margin-top: 16px;">
+            <a href="https://github.com/shopeetw225-byte/openclaw-social-push">GitHub</a>
+          </div>
+        </article>
+
+        <article class="project-card">
+          <div class="project-top">
+            <div>
+              <h2>TTS Companion Web</h2>
+              <div class="project-meta">本地优先的 AI 陪伴 Web MVP，目标是验证聊天、TTS 播放和图片生成能否组成完整体验。</div>
+            </div>
+            <span class="status">P1 · 可继续打磨 MVP</span>
+          </div>
+
+          <div class="meta-title">项目作用</div>
+          <p>给产品和工程团队一个可运行的陪伴式 Web MVP，支持 mock fallback，也支持接入 OpenAI 兼容服务。</p>
+
+          <div class="meta-title">当前状态</div>
+          <div class="subgrid">
+            <div class="mini-box">
+              <strong>已完成</strong>
+              <span>角色主页、聊天页、本地会话、TTS 接口和图片生成接口都已落地。</span>
+            </div>
+            <div class="mini-box">
+              <strong>可演示</strong>
+              <span>不配 API Key 也能用 mock provider 跑主链路，适合本地演示。</span>
+            </div>
+            <div class="mini-box">
+              <strong>未完成</strong>
+              <span>真实模型下的稳定性和 TTS 编排细节还没有完全打磨好。</span>
+            </div>
+          </div>
+
+          <div class="meta-title">当前阻塞</div>
+          <ul>
+            <li>`CompanionShell` 的 TTS 编排仍是最值得继续收口的点。</li>
+            <li>图片生成与资源缓存虽已可用，但在真实服务配置下还需要继续回归验证。</li>
+            <li>当前更适合拿来验证体验，不适合直接按正式生产产品预期使用。</li>
+          </ul>
+
+          <div class="meta-title">接手第一步</div>
+          <ul class="action-list">
+            <li>先在 mock 模式跑通，再切到真实 OpenAI 兼容配置做差异回归。</li>
+            <li>优先梳理 TTS 自动播放、重播和缓存回退链路。</li>
+            <li>把文档里提到的 MVP 边界继续固化到测试或验收清单里。</li>
+          </ul>
+
+          <div class="meta-title">关键入口</div>
+          <div class="tag-row">
+            <span class="tag">README / README.en</span>
+            <span class="tag">src/app/api/companion</span>
+            <span class="tag">src/lib/server/providers</span>
+            <span class="tag">src/components/companion</span>
+          </div>
+
+          <div class="link-row" style="margin-top: 16px;">
+            <a href="https://github.com/shopeetw225-byte/tts-companion-web">GitHub</a>
+          </div>
+        </article>
+
+        <article class="project-card">
+          <div class="project-top">
+            <div>
+              <h2>Sheep</h2>
+              <div class="project-meta">面向 POD 卖家的 AI 出图 MVP，已经把生成、素材沉淀和额度支付串成了一条商业化验证链路。</div>
+            </div>
+            <span class="status">P1 · 商业化链路可演示</span>
+          </div>
+
+          <div class="meta-title">项目作用</div>
+          <p>验证“营销落地页 -> 生成器 -> 素材库 -> 额度购买 -> 支付回写”这条业务闭环是否成立。</p>
+
+          <div class="meta-title">当前状态</div>
+          <div class="subgrid">
+            <div class="mini-box">
+              <strong>已完成</strong>
+              <span>营销首页、生成器、素材库和额度页都已具备独立页面与组件。</span>
+            </div>
+            <div class="mini-box">
+              <strong>业务链路</strong>
+              <span>Stripe checkout session 和 webhook fulfillment 已落地，Supabase 账号与素材存储也已接通。</span>
+            </div>
+            <div class="mini-box">
+              <strong>未完成</strong>
+              <span>真实供应商质量、额度边界和稳定性验证仍然不足。</span>
+            </div>
+          </div>
+
+          <div class="meta-title">当前阻塞</div>
+          <ul>
+            <li>系统依赖 Supabase、Stripe 和图片供应商三条外部链路，联调成本较高。</li>
+            <li>mock provider 适合本地开发，但不能代替真实商用质量验证。</li>
+            <li>目前更像产品验证中的 MVP，还不是稳定 SaaS 形态。</li>
+          </ul>
+
+          <div class="meta-title">接手第一步</div>
+          <ul class="action-list">
+            <li>先确认 Stripe / Supabase / 图片 provider 的真实联调环境是否可用。</li>
+            <li>把出图质量、额度扣减和退款边界做成更明确的回归清单。</li>
+            <li>优先从真实供应商环境下的生成结果和支付回写稳定性入手。</li>
+          </ul>
+
+          <div class="meta-title">关键入口</div>
+          <div class="tag-row">
+            <span class="tag">README</span>
+            <span class="tag">app/(workspace)</span>
+            <span class="tag">app/api/payments</span>
+            <span class="tag">lib/stripe</span>
+            <span class="tag">lib/providers</span>
+          </div>
+
+          <div class="link-row" style="margin-top: 16px;">
+            <a href="https://github.com/shopeetw225-byte/sheep">GitHub</a>
+          </div>
+        </article>
+
+        <article class="project-card">
+          <div class="project-top">
+            <div>
+              <h2>OpenClaw 安装器</h2>
+              <div class="project-meta">OpenClaw 的桌面安装和修复入口，负责安装、卸载、更新、诊断和 Gateway 管理，不是 OpenClaw 本体仓库。</div>
+            </div>
+            <span class="status warn">P2 · 交付链路待继续稳住</span>
+          </div>
+
+          <div class="meta-title">项目作用</div>
+          <p>把安装、修复、更新、日志查看和配置管理做成桌面应用，降低最终用户部署 OpenClaw 的门槛。</p>
+
+          <div class="meta-title">当前状态</div>
+          <div class="subgrid">
+            <div class="mini-box">
+              <strong>已完成</strong>
+              <span>安装 / 卸载 / 修复 / 更新 / 诊断 / 配置相关页面和平台脚本已经存在。</span>
+            </div>
+            <div class="mini-box">
+              <strong>平台范围</strong>
+              <span>Windows、macOS、Linux 的 bundle 目标已经在 Tauri 配置中打开。</span>
+            </div>
+            <div class="mini-box">
+              <strong>未完成</strong>
+              <span>签名、发布稳定性和不同平台环境差异处理仍没有完全收口。</span>
+            </div>
+          </div>
+
+          <div class="meta-title">当前阻塞</div>
+          <ul>
+            <li>实际可用发布产物仍受构建环境、平台权限和系统安全策略影响。</li>
+            <li>GUI 与脚本是并行维护状态，后续要注意行为一致性。</li>
+            <li>目前的风险不在“有没有功能”，而在“交付链路是否足够稳”。</li>
+          </ul>
+
+          <div class="meta-title">接手第一步</div>
+          <ul class="action-list">
+            <li>先验证最近一轮打包和安装文档能否对应上真实产物。</li>
+            <li>优先收口发布流水线、签名和平台差异问题。</li>
+            <li>把 README 里的能力边界持续和发布事实对齐，避免文档先于产物。</li>
+          </ul>
+
+          <div class="meta-title">关键入口</div>
+          <div class="tag-row">
+            <span class="tag">README</span>
+            <span class="tag">src</span>
+            <span class="tag">src-tauri</span>
+            <span class="tag">scripts</span>
+            <span class="tag">docs</span>
+          </div>
+
+          <div class="link-row" style="margin-top: 16px;">
+            <a href="https://github.com/shopeetw225-byte/openclaw-anzhuang">GitHub</a>
+          </div>
+        </article>
+
+        <article class="project-card">
+          <div class="project-top">
+            <div>
+              <h2>ssh-tool</h2>
+              <div class="project-meta">临时 SSH 远程支持工具，强调默认安全、可恢复和对离线 / 受策略限制环境的兼容。</div>
+            </div>
+            <span class="status warn">P2 · 可交付，但测试护栏偏薄</span>
+          </div>
+
+          <div class="meta-title">项目作用</div>
+          <p>让客户机器临时开启可回收的远程支持入口，尽量避免把 SSH 直接暴露到局域网，通过 relay 模型完成支持会话。</p>
+
+          <div class="meta-title">当前状态</div>
+          <div class="subgrid">
+            <div class="mini-box">
+              <strong>已完成</strong>
+              <span>Windows 与 macOS 双平台交付路径都在，EXE / ZIP / DMG / MSI 相关脚本齐全。</span>
+            </div>
+            <div class="mini-box">
+              <strong>支持模式</strong>
+              <span>支持公钥方式，也支持临时用户 + 随机密码的回退方式。</span>
+            </div>
+            <div class="mini-box">
+              <strong>未完成</strong>
+              <span>自动化验证护栏和更多环境下的稳定性证明还比较弱。</span>
+            </div>
+          </div>
+
+          <div class="meta-title">当前阻塞</div>
+          <ul>
+            <li>Windows 仍依赖 OpenSSH Server，在离线或被策略限制的环境中会更复杂。</li>
+            <li>macOS 仍依赖 `sudo` 权限和系统远程登录能力。</li>
+            <li>现在更像交付脚本仓库，不像有完整回归体系的应用仓库。</li>
+          </ul>
+
+          <div class="meta-title">接手第一步</div>
+          <ul class="action-list">
+            <li>先按 README 的 Windows / macOS 路径各走一遍，确认文档与打包产物一致。</li>
+            <li>优先补离线安装和 recover 流程的 smoke 验证。</li>
+            <li>如果要继续演进，先围绕交付稳定性补脚本级验证，而不是急着扩新特性。</li>
+          </ul>
+
+          <div class="meta-title">关键入口</div>
+          <div class="tag-row">
+            <span class="tag">README</span>
+            <span class="tag">packages/ssh-tool-win</span>
+            <span class="tag">packages/ssh-tool-mac</span>
+            <span class="tag">scripts</span>
+            <span class="tag">build</span>
+          </div>
+
+          <div class="link-row" style="margin-top: 16px;">
+            <a href="https://github.com/shopeetw225-byte/ssh-tool">GitHub</a>
+          </div>
+        </article>
+      </section>
+
+      <section class="footer-note">
+        交接结论可以压成一句话：`social-push` 最值得优先追，`sheep` 和 `tts-companion-web` 都已经到了可以继续做产品验证和外部依赖回归的阶段，
+        `openclaw-anzhuang` 与 `ssh-tool` 则更偏交付稳定性问题，后续投入最好集中在发布链路、环境兼容和验证护栏，而不是先扩功能面。
+      </section>
+    </main>
+  </body>
+</html>

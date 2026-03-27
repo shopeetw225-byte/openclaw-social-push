@@ -17,6 +17,35 @@
 
 每个目录内部都含有自己的 `SKILL.md`，可以在 OpenClaw workspace 里注册为独立 skill，方便在需要执行账号治理、节点预检或 cluster 任务时单独调用。
 
+## 这份指南适合谁
+
+如果你是下面几类人，这份文档最有帮助：
+
+- 第一次把 `social-push` 装到 OpenClaw workspace 的使用者
+- 需要配置 Telegram / QQ / 浏览器 relay 的运维人员
+- 负责多 agent / 多 worker 本地 cluster 演示的人
+- 想知道当前仓库能力边界，而不是只看单个平台 workflow 的协作者
+
+如果你主要想了解项目定位、能力分层和总体进度，先看根目录的 `README.md`；如果你要真的把它跑起来，再继续看这份 `GUIDE.md`。
+
+## 当前开发进度
+
+当前仓库已经不只是“发帖 skill”，而是一条可执行的协作链路：
+
+- 发布层：`social-push`
+- 治理层：`account-matrix`
+- 防撞层：`content-assignment-guard`
+- 节点内调度层：`matrix-orchestrator`
+- cluster 主控层：`openclaw-cluster-orchestrator`
+
+截至 `2026-03-27`，cluster 层已经具备：
+
+- worker readiness 检查
+- node-local runtime fan-out
+- cluster result / run-log 汇总
+- blocked / failed job 的 retry/requeue 入口
+- `cluster_status --include-readiness` 的 readiness 汇总输出
+
 ### 支持平台一览
 
 | 平台 | 内容类型 | 实测状态 | 备注 |
@@ -177,7 +206,7 @@ python3 openclaw-cluster-orchestrator/scripts/bootstrap_local_agents.py \
 - 主控 agent 继续处理用户入口和 cluster job queue
 - worker agent 负责消费节点本地 `docs/nodes/<node_id>/matrix/`
 - V1 worker 统一通过 `matrix-orchestrator/scripts/run_next_job.py` 执行，不直接绕过到 `social-push`
-- 如果 worker 节点走 `chrome-relay`，目标浏览器标签页必须先把 OpenClaw Browser Relay 扩展点成 `ON`，否则 cluster job 会真实返回 `runner_error`
+- 如果 worker 节点走 `chrome-relay`，主控现在会在真正派发前先做 readiness 检查；目标浏览器标签页必须先把 OpenClaw Browser Relay 扩展点成 `ON`，并确保已登录正确账号，否则 cluster job 会先被标记为 `routing_blocked`
 
 ### 3.2 Cluster Smoke 命令
 
@@ -200,9 +229,10 @@ python3 openclaw-cluster-orchestrator/scripts/run_next_cluster_job.py \
 
 1. 读取 `docs/cluster/node-matrix.md`
 2. 选择 `ready` 的 worker agent
-3. 把任务写入 `docs/nodes/<node_id>/matrix/job-queue.md`
-4. 调用目标 worker agent
-5. 回写：
+3. 检查该 worker 的 node-local `account-matrix.md` 与当前浏览器身份是否可用
+4. 把任务写入 `docs/nodes/<node_id>/matrix/job-queue.md`
+5. 调用目标 worker agent
+6. 回写：
    - `docs/cluster/cluster-job-queue.md`
    - `docs/cluster/cluster-result-ledger.md`
    - `docs/cluster/cluster-run-log.md`
@@ -218,6 +248,18 @@ python3 openclaw-cluster-orchestrator/scripts/cluster_status.py
 - cluster queue 各状态计数
 - 最新一条 cluster result
 - `node-matrix.md` 中每个节点的 agent id、节点状态与本地 queue 状态计数
+
+如果你想把每个 worker 的 readiness 也一起打出来：
+
+```bash
+python3 openclaw-cluster-orchestrator/scripts/cluster_status.py --include-readiness
+```
+
+这会额外输出：
+
+- 每个 `ready` worker 当前账号矩阵的探测结果
+- 每个账号别名对应的 `ok/reason`
+- 汇总后的节点级 `ready/degraded` 结论
 
 ### 3.2.1 添加一条 cluster job
 
@@ -269,6 +311,22 @@ python3 matrix-orchestrator/scripts/apply_guard_override.py \
   --action continue_once \
   --operator-ref op://openclaw-controller \
   --reason "checked and approved"
+```
+
+如果某条 cluster job 已经进入 `blocked` 或 `failed`，并且你已经修好浏览器 relay、登录态或其他环境问题，可以直接追加一条新的 retry attempt，而不是手改表格：
+
+```bash
+python3 openclaw-cluster-orchestrator/scripts/requeue_cluster_job.py \
+  --job-id cluster-job-0003
+```
+
+如果你只想基于某个特定 attempt 重试，并写上操作备注：
+
+```bash
+python3 openclaw-cluster-orchestrator/scripts/requeue_cluster_job.py \
+  --job-id cluster-job-0003 \
+  --attempt-no 1 \
+  --notes "retry after relay attached"
 ```
 
 ### 3.2.2 预览本地 worker bootstrap
