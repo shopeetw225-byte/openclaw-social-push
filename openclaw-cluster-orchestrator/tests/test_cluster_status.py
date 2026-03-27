@@ -16,6 +16,10 @@ class ClusterStatusTests(unittest.TestCase):
     def test_exports_cluster_status(self):
         self.assertTrue(hasattr(self.module, "cluster_status"))
 
+    def test_cli_accepts_include_readiness_flag(self):
+        args = self.module._build_arg_parser().parse_args(["--include-readiness"])
+        self.assertTrue(args.include_readiness)
+
     def test_summarizes_cluster_queue_and_latest_result_and_node_queues(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             root = pathlib.Path(tmpdir)
@@ -132,6 +136,225 @@ class ClusterStatusTests(unittest.TestCase):
             self.assertEqual(summary["cluster_queue"]["total"], 0)
             self.assertIsNone(summary["latest_result"])
             self.assertEqual(summary["nodes"]["worker-zhihu-01"]["queue"]["total"], 0)
+
+    def test_does_not_probe_readiness_by_default(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = pathlib.Path(tmpdir)
+            cluster_dir = root / "cluster"
+            nodes_dir = root / "nodes"
+            cluster_dir.mkdir()
+            (nodes_dir / "worker-zhihu-01" / "matrix").mkdir(parents=True)
+
+            (cluster_dir / "cluster-job-queue.md").write_text(
+                "| job_id | attempt_no | job_type | platform | account_alias | content_type | preferred_node | payload_json | status | notes |\n| --- | ---: | --- | --- | --- | --- | --- | --- | --- | --- |\n",
+                encoding="utf-8",
+            )
+            (cluster_dir / "cluster-result-ledger.md").write_text(
+                "| job_id | attempt_no | node_id | agent_id | job_type | result_status | evidence | notes | timestamp |\n| --- | ---: | --- | --- | --- | --- | --- | --- | --- |\n",
+                encoding="utf-8",
+            )
+            (cluster_dir / "node-matrix.md").write_text(
+                "| node_id | mode | agent_id | gateway_endpoint | platforms | account_aliases | browser_profiles | capabilities | status | notes |\n| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |\n| worker-zhihu-01 | local_agent | publisher-zhihu |  | zhihu | main | chrome-relay | publish | ready | zhihu |\n",
+                encoding="utf-8",
+            )
+            (nodes_dir / "worker-zhihu-01" / "matrix" / "account-matrix.md").write_text(
+                "| platform | account_alias | display_name | browser_profile |\n| --- | --- | --- | --- |\n| zhihu | main | Main Account | profile-1 |\n",
+                encoding="utf-8",
+            )
+
+            calls: list[tuple[object, ...]] = []
+
+            def fake_checker(**kwargs):
+                calls.append(
+                    (
+                        kwargs["node_runtime_root"],
+                        kwargs["node_id"],
+                        kwargs["platform"],
+                        kwargs["account_alias"],
+                    )
+                )
+                return {"ok": True, "reason": "ready"}
+
+            summary = self.module.cluster_status(
+                cluster_dir=cluster_dir,
+                nodes_root=nodes_dir,
+                worker_ready_checker=fake_checker,
+            )
+
+            self.assertNotIn("readiness", summary["nodes"]["worker-zhihu-01"])
+            self.assertEqual(calls, [])
+
+    def test_includes_readiness_for_ready_and_blocked_nodes(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = pathlib.Path(tmpdir)
+            cluster_dir = root / "cluster"
+            nodes_dir = root / "nodes"
+            cluster_dir.mkdir()
+            (nodes_dir / "worker-zhihu-01" / "matrix").mkdir(parents=True)
+            (nodes_dir / "worker-reddit-01" / "matrix").mkdir(parents=True)
+            (nodes_dir / "worker-fallback-01" / "matrix").mkdir(parents=True)
+
+            (cluster_dir / "cluster-job-queue.md").write_text(
+                "| job_id | attempt_no | job_type | platform | account_alias | content_type | preferred_node | payload_json | status | notes |\n| --- | ---: | --- | --- | --- | --- | --- | --- | --- | --- |\n",
+                encoding="utf-8",
+            )
+            (cluster_dir / "cluster-result-ledger.md").write_text(
+                "| job_id | attempt_no | node_id | agent_id | job_type | result_status | evidence | notes | timestamp |\n| --- | ---: | --- | --- | --- | --- | --- | --- | --- |\n",
+                encoding="utf-8",
+            )
+            (cluster_dir / "node-matrix.md").write_text(
+                textwrap.dedent(
+                    """
+                    | node_id | mode | agent_id | gateway_endpoint | platforms | account_aliases | browser_profiles | capabilities | status | notes |
+                    | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+                    | worker-zhihu-01 | local_agent | publisher-zhihu |  | zhihu | main | chrome-relay | publish | ready | zhihu |
+                    | worker-reddit-01 | local_agent | publisher-reddit |  | reddit | main | chrome-relay | publish | ready | reddit |
+                    | worker-fallback-01 | local_agent | publisher-fallback |  | zhihu,reddit |  | chrome-relay | publish | paused | fallback |
+                    """
+                ).strip() + "\n",
+                encoding="utf-8",
+            )
+            (nodes_dir / "worker-zhihu-01" / "matrix" / "account-matrix.md").write_text(
+                textwrap.dedent(
+                    """
+                    | platform | account_alias | display_name | browser_profile |
+                    | --- | --- | --- | --- |
+                    | zhihu | main | Main Zhihu | profile-zhihu |
+                    | zhihu | alt | Alt Zhihu | profile-zhihu-alt |
+                    """
+                ).strip() + "\n",
+                encoding="utf-8",
+            )
+            (nodes_dir / "worker-reddit-01" / "matrix" / "account-matrix.md").write_text(
+                textwrap.dedent(
+                    """
+                    | platform | account_alias | display_name | browser_profile |
+                    | --- | --- | --- | --- |
+                    | reddit | main | Main Reddit | profile-reddit |
+                    """
+                ).strip() + "\n",
+                encoding="utf-8",
+            )
+            (nodes_dir / "worker-fallback-01" / "matrix" / "account-matrix.md").write_text(
+                textwrap.dedent(
+                    """
+                    | platform | account_alias | display_name | browser_profile |
+                    | --- | --- | --- | --- |
+                    """
+                ).strip() + "\n",
+                encoding="utf-8",
+            )
+
+            calls: list[dict[str, object]] = []
+
+            def fake_checker(**kwargs):
+                calls.append(kwargs)
+                platform = kwargs["platform"]
+                account_alias = kwargs["account_alias"]
+                if platform == "zhihu" and account_alias == "main":
+                    return {"ok": True, "reason": "ready"}
+                if platform == "zhihu" and account_alias == "alt":
+                    return {"ok": False, "reason": "browser_profile_mismatch"}
+                if platform == "reddit":
+                    return {"ok": True, "reason": "ready"}
+                return {"ok": False, "reason": "unexpected"}
+
+            summary = self.module.cluster_status(
+                cluster_dir=cluster_dir,
+                nodes_root=nodes_dir,
+                include_readiness=True,
+                worker_ready_checker=fake_checker,
+            )
+
+            self.assertEqual(
+                calls,
+                [
+                    {
+                        "node_runtime_root": nodes_dir,
+                        "node_id": "worker-zhihu-01",
+                        "platform": "zhihu",
+                        "account_alias": "main",
+                    },
+                    {
+                        "node_runtime_root": nodes_dir,
+                        "node_id": "worker-zhihu-01",
+                        "platform": "zhihu",
+                        "account_alias": "alt",
+                    },
+                    {
+                        "node_runtime_root": nodes_dir,
+                        "node_id": "worker-reddit-01",
+                        "platform": "reddit",
+                        "account_alias": "main",
+                    },
+                ],
+            )
+            self.assertEqual(summary["nodes"]["worker-zhihu-01"]["readiness"], {
+                "ok": False,
+                "reason": "degraded",
+                "checks": [
+                    {"platform": "zhihu", "account_alias": "main", "ok": True, "reason": "ready"},
+                    {
+                        "platform": "zhihu",
+                        "account_alias": "alt",
+                        "ok": False,
+                        "reason": "browser_profile_mismatch",
+                    },
+                ],
+            })
+            self.assertEqual(summary["nodes"]["worker-reddit-01"]["readiness"], {
+                "ok": True,
+                "reason": "ready",
+                "checks": [
+                    {"platform": "reddit", "account_alias": "main", "ok": True, "reason": "ready"}
+                ],
+            })
+            self.assertEqual(summary["nodes"]["worker-fallback-01"]["readiness"], {
+                "ok": False,
+                "reason": "node_paused",
+                "checks": [],
+            })
+
+    def test_reports_missing_account_matrix_as_not_ready(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = pathlib.Path(tmpdir)
+            cluster_dir = root / "cluster"
+            nodes_dir = root / "nodes"
+            cluster_dir.mkdir()
+            (nodes_dir / "worker-zhihu-01" / "matrix").mkdir(parents=True)
+
+            (cluster_dir / "cluster-job-queue.md").write_text(
+                "| job_id | attempt_no | job_type | platform | account_alias | content_type | preferred_node | payload_json | status | notes |\n| --- | ---: | --- | --- | --- | --- | --- | --- | --- | --- |\n",
+                encoding="utf-8",
+            )
+            (cluster_dir / "cluster-result-ledger.md").write_text(
+                "| job_id | attempt_no | node_id | agent_id | job_type | result_status | evidence | notes | timestamp |\n| --- | ---: | --- | --- | --- | --- | --- | --- | --- |\n",
+                encoding="utf-8",
+            )
+            (cluster_dir / "node-matrix.md").write_text(
+                "| node_id | mode | agent_id | gateway_endpoint | platforms | account_aliases | browser_profiles | capabilities | status | notes |\n| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |\n| worker-zhihu-01 | local_agent | publisher-zhihu |  | zhihu | main | chrome-relay | publish | ready | zhihu |\n",
+                encoding="utf-8",
+            )
+
+            calls: list[dict[str, object]] = []
+
+            def fake_checker(**kwargs):
+                calls.append(kwargs)
+                return {"ok": True, "reason": "ready"}
+
+            summary = self.module.cluster_status(
+                cluster_dir=cluster_dir,
+                nodes_root=nodes_dir,
+                include_readiness=True,
+                worker_ready_checker=fake_checker,
+            )
+
+            self.assertEqual(calls, [])
+            self.assertEqual(summary["nodes"]["worker-zhihu-01"]["readiness"], {
+                "ok": False,
+                "reason": "missing_account_matrix",
+                "checks": [],
+            })
 
 
 if __name__ == "__main__":

@@ -30,7 +30,13 @@ MATRIX_ORCHESTRATOR_ENABLE_DEFAULT_RUNNER=1 python3 matrix-orchestrator/scripts/
 
 V1 workers must not bypass `matrix-orchestrator`.
 
-If the worker publishes through `chrome-relay`, the target browser tab must already have the OpenClaw Browser Relay extension attached and switched to `ON`. Otherwise the worker may return a truthful `runner_error` such as “no attached chrome-relay browser tabs”.
+Before the master writes a node-local job row, it should probe the selected worker runtime:
+
+- load `docs/nodes/<node_id>/matrix/account-matrix.md`
+- resolve the `platform + account_alias` row
+- use that row's `browser_profile` and `display_name` to probe current browser identity
+
+If the worker publishes through `chrome-relay`, the target browser tab must already have the OpenClaw Browser Relay extension attached and switched to `ON`. If the probe cannot confirm the expected logged-in identity, the master should stop before dispatch and record a cluster-side `routing_blocked` result instead of consuming the worker runtime.
 
 ## Required Payload Fields
 
@@ -70,6 +76,7 @@ Allowed `result_status` values:
 ## Master-Side Mapping
 
 - no ready worker -> `routing_blocked`
+- worker readiness probe fails before dispatch -> `routing_blocked`
 - OpenClaw dispatch failure -> `dispatch_error`
 - worker `preflight_blocked` -> cluster queue `blocked`
 - worker `publish_ok` / `publish_filtered` -> cluster queue `done`

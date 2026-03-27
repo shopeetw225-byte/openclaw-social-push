@@ -65,7 +65,8 @@ Required node-local files per worker:
 5. The worker must run `MATRIX_ORCHESTRATOR_ENABLE_DEFAULT_RUNNER=1 python3 matrix-orchestrator/scripts/run_next_job.py` exactly once for the selected node-local runtime.
 6. Cluster queue terminal states are only `done`, `failed`, or `blocked`.
 7. The master must not treat commentary or `toolUse` as a final worker result.
-8. If the worker depends on `chrome-relay`, the target browser tab must already have Browser Relay attached and switched to `ON`.
+8. Before enqueueing node-local work, the master must verify the selected worker is ready by checking its node-local `account-matrix.md` and probing the current browser identity.
+9. If the worker depends on `chrome-relay`, the target browser tab must already have Browser Relay attached and switched to `ON`.
 
 ## Cluster Status Model
 

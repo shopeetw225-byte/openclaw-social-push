@@ -195,12 +195,61 @@ def _finalize_dispatch_error(
     return {"status": "failed", "reason": "dispatch_error"}
 
 
+def _finalize_routing_blocked(
+    *,
+    headers: list[str],
+    rows: list[dict[str, str]],
+    original_lines: list[str],
+    queue_path: str | Path,
+    cluster_result_ledger_path: str | Path | None,
+    cluster_run_log_path: str | Path | None,
+    ledger_writer: Callable[..., Any],
+    run_log_writer: Callable[..., Any],
+    job: dict[str, str],
+    reason: str,
+    evidence: str = "",
+    node_id: str = "",
+    agent_id: str = "",
+) -> dict[str, Any]:
+    job["status"] = "blocked"
+    job["notes"] = reason
+    _write_table(queue_path, headers, rows, original_lines)
+    ledger_writer(
+        path=cluster_result_ledger_path or "docs/cluster/cluster-result-ledger.md",
+        row={
+            "job_id": job["job_id"],
+            "attempt_no": job["attempt_no"],
+            "node_id": node_id,
+            "agent_id": agent_id,
+            "job_type": job["job_type"],
+            "result_status": "routing_blocked",
+            "evidence": evidence,
+            "notes": reason,
+            "timestamp": _timestamp(),
+        },
+    )
+    run_log_writer(
+        path=cluster_run_log_path or "docs/cluster/cluster-run-log.md",
+        row={
+            "job_id": job["job_id"],
+            "attempt_no": job["attempt_no"],
+            "node_id": node_id,
+            "event": "ledger_updated",
+            "status": "routing_blocked",
+            "notes": reason,
+            "timestamp": _timestamp(),
+        },
+    )
+    return {"status": "blocked", "reason": reason}
+
+
 def run_next_cluster_job(
     queue_path: str | Path,
     node_matrix_rows: list[dict[str, str]] | None = None,
     dispatch_runner: Callable[[dict[str, str], dict[str, Any]], dict[str, Any]] | None = None,
     ledger_writer: Callable[..., Any] | None = None,
     run_log_writer: Callable[..., Any] | None = None,
+    worker_ready_checker: Callable[..., dict[str, Any]] | None = None,
     node_runtime_root: str | Path = "docs/nodes",
     node_matrix_path: str | Path | None = None,
     cluster_result_ledger_path: str | Path | None = None,
@@ -231,6 +280,9 @@ def run_next_cluster_job(
     if run_log_writer is None:
         run_log_module = _load_script_module("append_cluster_run_log.py", "append_cluster_run_log")
         run_log_writer = run_log_module.append_cluster_run_log
+    if worker_ready_checker is None:
+        worker_ready_module = _load_script_module("check_worker_ready.py", "check_worker_ready")
+        worker_ready_checker = worker_ready_module.check_worker_ready
     selector_module = _load_script_module("select_worker.py", "select_worker")
 
     headers, rows, original_lines = _read_table(queue_path)
@@ -258,70 +310,34 @@ def run_next_cluster_job(
     )
 
     if job.get("job_type", "").strip() != "publish":
-        job["status"] = "blocked"
-        job["notes"] = "unsupported_job_type"
-        _write_table(queue_path, headers, rows, original_lines)
-        ledger_writer(
-            path=cluster_result_ledger_path or "docs/cluster/cluster-result-ledger.md",
-            row={
-                "job_id": job["job_id"],
-                "attempt_no": job["attempt_no"],
-                "node_id": "",
-                "agent_id": "",
-                "job_type": job["job_type"],
-                "result_status": "routing_blocked",
-                "evidence": "",
-                "notes": "unsupported_job_type",
-                "timestamp": _timestamp(),
-            },
+        return _finalize_routing_blocked(
+            headers=headers,
+            rows=rows,
+            original_lines=original_lines,
+            queue_path=queue_path,
+            cluster_result_ledger_path=cluster_result_ledger_path,
+            cluster_run_log_path=cluster_run_log_path,
+            ledger_writer=ledger_writer,
+            run_log_writer=run_log_writer,
+            job=job,
+            reason="unsupported_job_type",
         )
-        run_log_writer(
-            path=cluster_run_log_path or "docs/cluster/cluster-run-log.md",
-            row={
-                "job_id": job["job_id"],
-                "attempt_no": job["attempt_no"],
-                "node_id": "",
-                "event": "ledger_updated",
-                "status": "routing_blocked",
-                "notes": "unsupported_job_type",
-                "timestamp": _timestamp(),
-            },
-        )
-        return {"status": "blocked", "reason": "unsupported_job_type"}
 
     try:
         worker = selector_module.select_worker(node_matrix_rows, job)
     except ValueError as exc:
-        job["status"] = "blocked"
-        job["notes"] = str(exc)
-        _write_table(queue_path, headers, rows, original_lines)
-        ledger_writer(
-            path=cluster_result_ledger_path or "docs/cluster/cluster-result-ledger.md",
-            row={
-                "job_id": job["job_id"],
-                "attempt_no": job["attempt_no"],
-                "node_id": "",
-                "agent_id": "",
-                "job_type": job["job_type"],
-                "result_status": "routing_blocked",
-                "evidence": "",
-                "notes": str(exc),
-                "timestamp": _timestamp(),
-            },
+        return _finalize_routing_blocked(
+            headers=headers,
+            rows=rows,
+            original_lines=original_lines,
+            queue_path=queue_path,
+            cluster_result_ledger_path=cluster_result_ledger_path,
+            cluster_run_log_path=cluster_run_log_path,
+            ledger_writer=ledger_writer,
+            run_log_writer=run_log_writer,
+            job=job,
+            reason=str(exc),
         )
-        run_log_writer(
-            path=cluster_run_log_path or "docs/cluster/cluster-run-log.md",
-            row={
-                "job_id": job["job_id"],
-                "attempt_no": job["attempt_no"],
-                "node_id": "",
-                "event": "ledger_updated",
-                "status": "routing_blocked",
-                "notes": str(exc),
-                "timestamp": _timestamp(),
-            },
-        )
-        return {"status": "blocked", "reason": str(exc)}
 
     node_id = worker.get("node_id", "").strip()
     agent_id = worker.get("agent_id", "").strip()
@@ -337,6 +353,31 @@ def run_next_cluster_job(
             "timestamp": _timestamp(),
         },
     )
+
+    readiness = worker_ready_checker(
+        node_runtime_root=node_runtime_root,
+        node_id=node_id,
+        platform=job.get("platform", "").strip(),
+        account_alias=job.get("account_alias", "").strip(),
+    )
+    if not bool(readiness.get("ok")):
+        readiness_reason = str(readiness.get("reason", "")).strip() or "unknown"
+        block_reason = f"worker_not_ready:{readiness_reason}"
+        return _finalize_routing_blocked(
+            headers=headers,
+            rows=rows,
+            original_lines=original_lines,
+            queue_path=queue_path,
+            cluster_result_ledger_path=cluster_result_ledger_path,
+            cluster_run_log_path=cluster_run_log_path,
+            ledger_writer=ledger_writer,
+            run_log_writer=run_log_writer,
+            job=job,
+            reason=block_reason,
+            evidence=json.dumps(readiness, ensure_ascii=False),
+            node_id=node_id,
+            agent_id=agent_id,
+        )
 
     try:
         _append_node_local_job(node_runtime_root, node_id, job)

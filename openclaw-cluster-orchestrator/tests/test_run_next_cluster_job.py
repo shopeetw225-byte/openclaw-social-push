@@ -76,6 +76,25 @@ NODE_QUEUE_TEMPLATE = textwrap.dedent(
     """
 ).strip()
 
+NODE_ACCOUNT_MATRIX_TEMPLATE = textwrap.dedent(
+    """
+    | account_alias | platform | display_name | browser_profile | default | notes |
+    | --- | --- | --- | --- | --- | --- |
+    {rows}
+    """
+).strip()
+
+
+def _ready_check_result() -> dict[str, str]:
+    return {
+        "ok": True,
+        "reason": "ready",
+        "status": "ok",
+        "observed_account": "main",
+        "jump_target": "",
+        "notes": "",
+    }
+
 
 class RunNextClusterJobTests(unittest.TestCase):
     @classmethod
@@ -136,6 +155,80 @@ class RunNextClusterJobTests(unittest.TestCase):
             self.assertEqual(ledger_calls[-1]["result_status"], "routing_blocked")
             self.assertTrue(any(row["event"] == "job_started" for row in log_calls))
 
+    def test_blocks_when_worker_is_not_ready_before_node_local_enqueue(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp = pathlib.Path(tmpdir)
+            queue_path = tmp / "cluster-job-queue.md"
+            queue_path.write_text(
+                CLUSTER_QUEUE_TEMPLATE.format(rows=_cluster_row("cluster-job-3b", 1, "pending")) + "\n",
+                encoding="utf-8",
+            )
+            node_root = tmp / "nodes"
+            node_queue = node_root / "worker-zhihu-01" / "matrix" / "job-queue.md"
+            node_queue.parent.mkdir(parents=True, exist_ok=True)
+            node_queue.write_text(NODE_QUEUE_TEMPLATE.format(rows="") + "\n", encoding="utf-8")
+            (node_root / "worker-zhihu-01" / "matrix" / "account-matrix.md").write_text(
+                NODE_ACCOUNT_MATRIX_TEMPLATE.format(
+                    rows="| main | zhihu | 嘤嘤嘤 | chrome-relay | yes | ready check |"
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            ledger_calls = []
+            log_calls = []
+            dispatch_calls = []
+
+            def fake_dispatch(*_args, **_kwargs):
+                dispatch_calls.append(True)
+                return {
+                    "ok": True,
+                    "result_status": "publish_ok",
+                    "evidence": "should-not-run",
+                    "notes": "should-not-run",
+                }
+
+            result = self.module.run_next_cluster_job(
+                queue_path=queue_path,
+                node_matrix_rows=[
+                    {
+                        "node_id": "worker-zhihu-01",
+                        "mode": "local_agent",
+                        "agent_id": "publisher-zhihu",
+                        "platforms": "zhihu",
+                        "account_aliases": "main",
+                        "browser_profiles": "chrome-relay",
+                        "capabilities": "publish",
+                        "status": "ready",
+                        "notes": "",
+                    }
+                ],
+                dispatch_runner=fake_dispatch,
+                ledger_writer=lambda *_args, **kwargs: ledger_calls.append(kwargs["row"]),
+                run_log_writer=lambda *_args, **kwargs: log_calls.append(kwargs["row"]),
+                node_runtime_root=node_root,
+                worker_ready_checker=lambda **_kwargs: {
+                    "ok": False,
+                    "reason": "not_logged_in",
+                    "status": "not_logged_in",
+                    "observed_account": "not_logged_in",
+                    "jump_target": "https://www.zhihu.com/signin",
+                    "notes": "login required",
+                },
+            )
+
+            queue_after = queue_path.read_text(encoding="utf-8")
+            node_queue_after = node_queue.read_text(encoding="utf-8")
+            self.assertEqual(result["status"], "blocked")
+            self.assertEqual(result["reason"], "worker_not_ready:not_logged_in")
+            self.assertIn("| cluster-job-3b | 1 | publish | zhihu | main | idea |  |  |  | {\"title\":\"Hello\",\"body\":\"Body\",\"media_paths\":[]} | blocked | worker_not_ready:not_logged_in |", queue_after)
+            self.assertEqual(node_queue_after, NODE_QUEUE_TEMPLATE.format(rows="") + "\n")
+            self.assertEqual(ledger_calls[-1]["result_status"], "routing_blocked")
+            self.assertEqual(ledger_calls[-1]["notes"], "worker_not_ready:not_logged_in")
+            self.assertIn("not_logged_in", ledger_calls[-1]["evidence"])
+            self.assertEqual(dispatch_calls, [])
+            self.assertFalse(any(row["event"] == "dispatch_started" for row in log_calls))
+
     def test_marks_done_and_writes_node_local_job_for_publish_ok(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             tmp = pathlib.Path(tmpdir)
@@ -191,6 +284,7 @@ class RunNextClusterJobTests(unittest.TestCase):
                 ledger_writer=lambda *_args, **kwargs: ledger_calls.append(kwargs["row"]),
                 run_log_writer=lambda *_args, **kwargs: log_calls.append(kwargs["row"]),
                 node_runtime_root=node_root,
+                worker_ready_checker=lambda **_kwargs: _ready_check_result(),
             )
 
             queue_after = queue_path.read_text(encoding="utf-8")
@@ -241,6 +335,7 @@ class RunNextClusterJobTests(unittest.TestCase):
                 ledger_writer=lambda *_args, **kwargs: ledger_calls.append(kwargs["row"]),
                 run_log_writer=lambda *_args, **_kwargs: None,
                 node_runtime_root=node_root,
+                worker_ready_checker=lambda **_kwargs: _ready_check_result(),
             )
 
             self.assertEqual(result["status"], "failed")
@@ -283,6 +378,7 @@ class RunNextClusterJobTests(unittest.TestCase):
                 ledger_writer=lambda *_args, **kwargs: ledger_calls.append(kwargs["row"]),
                 run_log_writer=lambda *_args, **kwargs: log_calls.append(kwargs["row"]),
                 node_runtime_root=node_root,
+                worker_ready_checker=lambda **_kwargs: _ready_check_result(),
             )
 
             queue_after = queue_path.read_text(encoding="utf-8")
@@ -331,6 +427,7 @@ class RunNextClusterJobTests(unittest.TestCase):
                 ledger_writer=lambda *_args, **kwargs: ledger_calls.append(kwargs["row"]),
                 run_log_writer=lambda *_args, **kwargs: log_calls.append(kwargs["row"]),
                 node_runtime_root=node_root,
+                worker_ready_checker=lambda **_kwargs: _ready_check_result(),
             )
 
             queue_after = queue_path.read_text(encoding="utf-8")
@@ -380,6 +477,7 @@ class RunNextClusterJobTests(unittest.TestCase):
                 ledger_writer=lambda *_args, **kwargs: ledger_calls.append(kwargs["row"]),
                 run_log_writer=lambda *_args, **_kwargs: None,
                 node_runtime_root=node_root,
+                worker_ready_checker=lambda **_kwargs: _ready_check_result(),
             )
 
             self.assertEqual(result["status"], "blocked")
@@ -421,6 +519,7 @@ class RunNextClusterJobTests(unittest.TestCase):
                 dry_run_result_status="publish_filtered",
                 dry_run_evidence="demo://cluster/filter",
                 dry_run_notes="demo",
+                worker_ready_checker=lambda **_kwargs: _ready_check_result(),
             )
 
             self.assertEqual(result["status"], "done")

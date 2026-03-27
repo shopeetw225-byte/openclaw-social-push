@@ -540,6 +540,19 @@ python3 openclaw-cluster-orchestrator/scripts/bootstrap_local_agents.py \
   --dry-run
 ```
 
+如果你想看每个 worker 当前是否真的 ready，可把 readiness 一起打出来：
+
+```bash
+python3 openclaw-cluster-orchestrator/scripts/cluster_status.py --include-readiness
+```
+
+如果某条 cluster job 已经 `blocked` 或 `failed`，并且环境已经修好，可以直接追加新的 retry attempt：
+
+```bash
+python3 openclaw-cluster-orchestrator/scripts/requeue_cluster_job.py \
+  --job-id cluster-job-0003
+```
+
 如果你想清空 cluster runtime 与 node-local runtime，只保留表头：
 
 ```bash
@@ -558,6 +571,7 @@ V1 目前已经验证：
 
 - 目标 worker 使用的账号必须已经登录到对应平台
 - 如果该节点依赖 `chrome-relay`，目标浏览器标签页上的 OpenClaw Browser Relay 必须是 `ON`
+- 主控会在写入 node-local queue 前先检查 worker 的浏览器身份；如果没有附着可用标签页、未登录或账号不匹配，cluster queue 会直接记为 `blocked`，cluster ledger 会记一条 `routing_blocked`
 
 ## 10. 图片处理机制
 
